@@ -1,27 +1,27 @@
-from admin.pagination import CustomPagination
-from rest_framework import exceptions, generics, viewsets, status, mixins
-from django.shortcuts import render
-from rest_framework import response
+from rest_framework import exceptions, viewsets, status, generics, mixins
 from rest_framework.decorators import api_view
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Role, User, Permission
+from rest_framework.views import APIView
+
+from admin.pagination import CustomPagination
+from .authentication import generate_access_token, JWTAuthentication
+from .models import User, Permission, Role
 from .permissions import ViewPermissions
 from .serializers import UserSerializer, PermissionSerializer, RoleSerializer
-from .authentication import generate_access_token, JWTAuthentication
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-# Create your views here.
 
 
 @api_view(['POST'])
 def register(request):
     data = request.data
+
     if data['password'] != data['password_confirm']:
-        raise exceptions.APIException("Password do not Match!")
-    serializers = UserSerializer(data=data)
-    serializers.is_valid(raise_exception=True)
-    serializers.save()
-    return Response(serializers.data)
+        raise exceptions.APIException('Passwords do not match!')
+    data['role'] = 3
+    serializer = UserSerializer(data=data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
 
 
 @api_view(['POST'])
@@ -38,11 +38,13 @@ def login(request):
         raise exceptions.AuthenticationFailed('Incorrect Password!')
 
     response = Response()
+
     token = generate_access_token(user)
     response.set_cookie(key='jwt', value=token, httponly=True)
     response.data = {
         'jwt': token
     }
+
     return response
 
 
@@ -51,7 +53,7 @@ def logout(_):
     response = Response()
     response.delete_cookie(key='jwt')
     response.data = {
-        'message': 'Success Logout'
+        'message': 'Success'
     }
     return response
 
@@ -74,11 +76,10 @@ class PermissionAPIView(APIView):
 
     def get(self, request):
         serializer = PermissionSerializer(Permission.objects.all(), many=True)
-        return Response(
-            {
-                'data': serializer.data
-            }
-        )
+
+        return Response({
+            'data': serializer.data
+        })
 
 
 class RoleViewSet(viewsets.ViewSet):
